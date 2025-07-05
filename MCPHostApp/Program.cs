@@ -6,6 +6,7 @@ using ModelContextProtocol.Client;
 using System.Threading.Tasks;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 
 
 // --- MCP OAuth Setup for GitHub ---
@@ -100,6 +101,13 @@ async Task ConnectToGitHubMcpServer(string serverUrl, string accessToken)
             using var reader = new StreamReader(stream);
             
             Console.WriteLine("📡 Listening for SSE events...");
+            
+            // Initialize MCP session
+            await SendMcpInitialize(httpClient, serverUrl, accessToken);
+            
+            // Request to create repository
+            await CreateRepositoryViaMcp(httpClient, serverUrl, accessToken);
+            
             Console.WriteLine("Press Ctrl+C to disconnect");
             
             string? line;
@@ -110,8 +118,8 @@ async Task ConnectToGitHubMcpServer(string serverUrl, string accessToken)
                     var data = line.Substring(6); // Remove "data: " prefix
                     Console.WriteLine($"📨 Received MCP message: {data}");
                     
-                    // Here you would parse the MCP message and respond accordingly
-                    // For now, we'll just display the raw message
+                    // Parse and handle MCP responses
+                    await HandleMcpMessage(data, httpClient, serverUrl, accessToken);
                 }
                 else if (line.StartsWith("event: "))
                 {
@@ -135,6 +143,138 @@ async Task ConnectToGitHubMcpServer(string serverUrl, string accessToken)
     {
         Console.WriteLine($"❌ Error connecting to MCP SSE server: {ex.Message}");
         Console.WriteLine($"Stack trace: {ex.StackTrace}");
+    }
+}
+
+async Task SendMcpInitialize(HttpClient httpClient, string serverUrl, string accessToken)
+{
+    var initializeRequest = new
+    {
+        jsonrpc = "2.0",
+        id = 1,
+        method = "initialize",
+        @params = new
+        {
+            protocolVersion = "2024-11-05",
+            capabilities = new
+            {
+                tools = new { },
+                resources = new { }
+            },
+            clientInfo = new
+            {
+                name = "MCP-OAuth-Client",
+                version = "1.0.0"
+            }
+        }
+    };
+    
+    await SendMcpRequest(httpClient, serverUrl, accessToken, initializeRequest);
+}
+
+async Task CreateRepositoryViaMcp(HttpClient httpClient, string serverUrl, string accessToken)
+{
+    // First, let's list available tools
+    var listToolsRequest = new
+    {
+        jsonrpc = "2.0",
+        id = 2,
+        method = "tools/list"
+    };
+    
+    Console.WriteLine("🔍 Requesting available MCP tools...");
+    await SendMcpRequest(httpClient, serverUrl, accessToken, listToolsRequest);
+    
+    // Wait a moment for the response
+    await Task.Delay(2000);
+    
+    // Try to create repository using potential GitHub MCP tool
+    var createRepoRequest = new
+    {
+        jsonrpc = "2.0",
+        id = 3,
+        method = "tools/call",
+        @params = new
+        {
+            name = "create_repository",
+            arguments = new
+            {
+                name = "MCP-OAuth-Client",
+                description = "C# OAuth 2.0 client for GitHub MCP server with SSE connection",
+                @private = false,
+                auto_init = false
+            }
+        }
+    };
+    
+    Console.WriteLine("🚀 Attempting to create GitHub repository via MCP...");
+    await SendMcpRequest(httpClient, serverUrl, accessToken, createRepoRequest);
+}
+
+async Task SendMcpRequest(HttpClient httpClient, string serverUrl, string accessToken, object request)
+{
+    try
+    {
+        var json = JsonSerializer.Serialize(request, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = true
+        });
+        
+        Console.WriteLine($"📤 Sending MCP request: {json}");
+        
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var postUrl = serverUrl.TrimEnd('/') + "/rpc";
+        
+        using var postClient = new HttpClient();
+        postClient.DefaultRequestHeaders.Authorization = 
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        
+        var response = await postClient.PostAsync(postUrl, content);
+        var responseContent = await response.Content.ReadAsStringAsync();
+        
+        Console.WriteLine($"📥 MCP Response ({response.StatusCode}): {responseContent}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error sending MCP request: {ex.Message}");
+    }
+}
+
+async Task HandleMcpMessage(string data, HttpClient httpClient, string serverUrl, string accessToken)
+{
+    try
+    {
+        var jsonDoc = JsonDocument.Parse(data);
+        var root = jsonDoc.RootElement;
+        
+        if (root.TryGetProperty("method", out var method))
+        {
+            if (method.GetString() == "ping")
+            {
+                // Respond to ping with pong
+                var pongResponse = new
+                {
+                    jsonrpc = "2.0",
+                    id = root.GetProperty("id").GetInt32(),
+                    result = new { }
+                };
+                
+                await SendMcpRequest(httpClient, serverUrl, accessToken, pongResponse);
+            }
+        }
+        else if (root.TryGetProperty("result", out var result))
+        {
+            Console.WriteLine($"✅ MCP Result received: {result}");
+        }
+        else if (root.TryGetProperty("error", out var error))
+        {
+            Console.WriteLine($"❌ MCP Error: {error}");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error handling MCP message: {ex.Message}");
     }
 }
 

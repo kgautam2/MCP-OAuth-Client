@@ -47,3 +47,4 @@
 /Users/kushalgautam/Desktop/MCP/MCPHostApp/bin/Debug/net9.0/Microsoft.Extensions.Configuration.Json.dll
 /Users/kushalgautam/Desktop/MCP/MCPHostApp/bin/Debug/net9.0/Microsoft.Extensions.FileProviders.Physical.dll
 /Users/kushalgautam/Desktop/MCP/MCPHostApp/bin/Debug/net9.0/Microsoft.Extensions.FileSystemGlobbing.dll
+/Users/kushalgautam/Desktop/MCP/MCPHostApp/obj/Debug/net9.0/MCPHostApp.sourcelink.json

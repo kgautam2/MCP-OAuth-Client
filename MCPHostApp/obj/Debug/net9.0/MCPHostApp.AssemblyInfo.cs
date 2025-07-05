@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MCPHostApp")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+74e7fae268971ac63e9faa74139a9866e60d9156")]
 [assembly: System.Reflection.AssemblyProductAttribute("MCPHostApp")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MCPHostApp")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
